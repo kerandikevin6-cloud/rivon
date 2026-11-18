@@ -436,7 +436,7 @@ body.no-tabs main{padding-bottom:env(safe-area-inset-bottom)}
    white knob is the difference between reading it and checking it. */
 .switch[aria-checked="true"]{
   background:var(--accent-fill);border-color:var(--accent-fill-2);
-  box-shadow:0 1px 3px rgba(225,29,72,.35);
+  box-shadow:0 1px 3px rgba(22,163,74,.35);
 }
 .switch[aria-checked="true"]::after{transform:translateX(16px);background:#fff}
 .drawer-foot{margin-top:auto;padding:10px;border-top:1px solid var(--line-soft)}
@@ -505,7 +505,7 @@ body.no-tabs main{padding-bottom:env(safe-area-inset-bottom)}
 .tabbar a.active{color:var(--accent-ink)}
 .tabbar a.active::before{
   background:var(--accent-fill);
-  box-shadow:0 2px 8px rgba(225,29,72,.35);
+  box-shadow:0 2px 8px rgba(22,163,74,.35);
 }
 .tabbar a.active .tb-ico{color:var(--accent-ink)}
 .tabbar a:active{transform:scale(.94)}
@@ -754,7 +754,7 @@ body.no-tabs main{padding-bottom:env(safe-area-inset-bottom)}
   border-color:var(--accent-fill-2);
   /* The glow is the blue's own colour, so the capsule looks lit rather
      than dropped on top of the track. */
-  box-shadow:0 1px 2px rgba(190,18,60,.24), 0 6px 16px rgba(225,29,72,.28);
+  box-shadow:0 1px 2px rgba(21,128,61,.24), 0 6px 16px rgba(22,163,74,.28);
 }
 @media (prefers-reduced-motion:reduce){ .seg button::before{transition:none} }
 .row-3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -1560,7 +1560,7 @@ footer a:hover{color:var(--text-2)}
 .rnav.on .rnav-ico{color:var(--accent-ink)}
 .rnav.on .rnav-ico::before{
   content:"";position:absolute;width:36px;height:36px;border-radius:var(--r);
-  background:var(--accent-fill);box-shadow:0 2px 8px rgba(225,29,72,.3);
+  background:var(--accent-fill);box-shadow:0 2px 8px rgba(22,163,74,.3);
 }
 .rnav.on .rnav-lab{font-weight:500}
 .rnav.danger{color:var(--neg)}
@@ -1725,7 +1725,7 @@ footer a:hover{color:var(--text-2)}
 .wm-name i{font-weight:400;color:var(--accent)}
 /* The landing footer is dark in both themes, so the light theme's blue —
    which is pulled dark to work on white — would disappear into it. */
-.lfoot .wm-name i{color:#FB7185}
+.lfoot .wm-name i{color:#4ADE80}
 
 /* On a phone the bar carries the menu, the name, the balance, Deposit
    and the bell. The name is the first thing to give ground: the
@@ -3146,7 +3146,7 @@ body[data-chrome="app"] main{background:var(--bg)}
    JS with no React runtime: five 4x35 bars, 2px apart, scaling on a
    staggered delay, in the same indigo. Everything that waits uses this
    one, so a spinner never means two different things. */
-:root{--loader:#F43F5E}
+:root{--loader:#22C55E}
 .scaleloader{display:inline-flex;align-items:center;gap:4px;height:35px}
 .scaleloader i{
   display:block;width:4px;height:35px;border-radius:2px;
@@ -4049,12 +4049,12 @@ html{touch-action:manipulation;overflow-x:clip}
 :root[data-theme="light"] .dcell.cold .dpct{color:#C02A33;font-weight:600}
 :root[data-theme="light"] .dcell.cur .digit,
 :root[data-theme="light"] .dcell.cur.sel .digit{
-  border:2.5px solid #E11D48;color:#BE123C;font-weight:700;background:#FFF1F2;
+  border:2.5px solid #16A34A;color:#15803D;font-weight:700;background:#F0FDF4;
   box-shadow:0 0 0 3px rgba(0,155,99,.12);
 }
-:root[data-theme="light"] .dcell.cur .dpct{color:#BE123C;font-weight:700}
-:root[data-theme="light"] .dcell.cur::after{border-bottom-color:#E11D48}
-:root[data-theme="light"] .dcell.sel .digit{border-color:#E11D48;background:#FFF1F2;color:#BE123C}
+:root[data-theme="light"] .dcell.cur .dpct{color:#15803D;font-weight:700}
+:root[data-theme="light"] .dcell.cur::after{border-bottom-color:#16A34A}
+:root[data-theme="light"] .dcell.sel .digit{border-color:#16A34A;background:#F0FDF4;color:#15803D}
 :root[data-theme="light"] .dcell.cur.hit .digit,
 :root[data-theme="light"] .dcell.cur.sel.hit .digit{
   border-color:var(--pos);background:var(--pos);color:#fff;
@@ -4074,9 +4074,9 @@ html{touch-action:manipulation;overflow-x:clip}
    and red still mean money won and lost, and the dark theme's live
    digit stays Novi's yellow.
    ================================================================ */
-:root,:root[data-theme="light"]{--accent:#BE123C;--accent-soft:#FFF1F2;--accent-fill:#E11D48;--accent-fill-2:#BE123C;--seg-on:#E11D48;--chart-line:#F43F5E;--chart-fill:rgba(244,63,94,.10);--loader:#F43F5E;--tint-blue:#FFF1F2;--tick:#E11D48;--tick-line:#E11D48;--tick-text:#BE123C;--tick-soft:#FFF1F2;}
-:root[data-theme="dark"]{--accent:#FB7185;--accent-soft:#3F0D1A;--accent-fill:#E11D48;--accent-fill-2:#BE123C;--seg-on:#E11D48;--chart-line:#FB7185;--chart-fill:rgba(251,113,133,.10);--loader:#FB7185;--tint-blue:#3F0D1A;}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--accent:#FB7185;--accent-soft:#3F0D1A;--accent-fill:#E11D48;--accent-fill-2:#BE123C;--seg-on:#E11D48;--chart-line:#FB7185;--chart-fill:rgba(251,113,133,.10);--loader:#FB7185;--tint-blue:#3F0D1A;}}
+:root,:root[data-theme="light"]{--accent:#15803D;--accent-soft:#F0FDF4;--accent-fill:#16A34A;--accent-fill-2:#15803D;--seg-on:#16A34A;--chart-line:#22C55E;--chart-fill:rgba(34,197,94,.10);--loader:#22C55E;--tint-blue:#F0FDF4;--tick:#16A34A;--tick-line:#16A34A;--tick-text:#15803D;--tick-soft:#F0FDF4;}
+:root[data-theme="dark"]{--accent:#4ADE80;--accent-soft:#0F2A1A;--accent-fill:#16A34A;--accent-fill-2:#15803D;--seg-on:#16A34A;--chart-line:#4ADE80;--chart-fill:rgba(74,222,128,.10);--loader:#4ADE80;--tint-blue:#0F2A1A;}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--accent:#4ADE80;--accent-soft:#0F2A1A;--accent-fill:#16A34A;--accent-fill-2:#15803D;--seg-on:#16A34A;--chart-line:#4ADE80;--chart-fill:rgba(74,222,128,.10);--loader:#4ADE80;--tint-blue:#0F2A1A;}}
 
 /* ---- green and red keep their meaning whatever the brand ----
    On Novi these read green because the brand is green; here they stay
@@ -4240,6 +4240,37 @@ body[data-page="ai"] main .shell{flex:1;min-height:0;display:flex;flex-direction
   #aiPage .es-best .es-why{margin-top:4px}
 }
 
+
+
+/* ---- the cookie card, as on the Kivo sites: a small floating card,
+   an icon, a title, one line, two buttons ---- */
+html body .consent{
+  left:12px;right:12px;bottom:calc(var(--tabbar-h, 62px) + 12px + env(safe-area-inset-bottom));
+  max-width:none;padding:14px;gap:12px;display:grid;grid-template-columns:auto 1fr;align-items:start;
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  box-shadow:0 12px 32px rgba(0,0,0,.12);
+}
+html body .consent .consent-ico{
+  width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+  background:var(--accent-soft);color:var(--accent-fill);flex:none;
+}
+html body .consent p{margin:0;min-width:0;font-size:12.5px;line-height:1.45;color:var(--text-2)}
+html body .consent p b{display:block;font-size:13.5px;font-weight:600;color:var(--text);margin-bottom:1px}
+html body .consent .consent-btns{grid-column:1 / -1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+html body .consent .btn-mini{
+  height:36px;border-radius:6px;font-size:13px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  border:1px solid var(--line);background:transparent;color:var(--text);
+}
+html body .consent .btn-mini.solid{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
+@media (min-width:900px){
+  html body .consent{left:auto;right:20px;bottom:20px;width:340px}
+}
+@media (max-width:899px){
+  html body[data-chrome="auth"] .consent,html body[data-chrome="plain"] .consent,html body.no-tabs .consent{
+    bottom:calc(12px + env(safe-area-inset-bottom));
+  }
+}
 
 </style>
 
@@ -11911,7 +11942,8 @@ window.NEXAS_API = window.NEXAS_API || window.NEXAS_CONFIG.apiBase;
     if (API.prefs.consent()) return;
     var c = document.createElement('div');
     c.className = 'consent';
-    c.innerHTML = '<p>We use essential cookies to keep you signed in. Nothing is shared with advertisers.</p>' +
+    c.innerHTML = '<span class="consent-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"/><path d="M8.5 8.5v.01"/><path d="M16 15.5v.01"/><path d="M12 12v.01"/><path d="M11 17v.01"/><path d="M7 14v.01"/></svg></span>' +
+      '<p><b>Cookies</b>Only what keeps you signed in. Nothing goes to advertisers.</p>' +
       '<div class="consent-btns">' +
         '<button class="btn-mini" data-consent="essential">Essential only</button>' +
         '<button class="btn-mini solid" data-consent="all">Accept</button>' +

@@ -36,12 +36,9 @@
     render();
   }
 
-  function addButton() {
-    return A.can(me, 'manager')
-      ? '<button class="btn btn-primary btn-sm" id="addBtn">' +
-        A.icon('plus', 15) + 'Add a domain</button>'
-      : '';
-  }
+  /* This is one site's console: domains are added and taken offline
+     from the main console only, and the API refuses it from here. */
+  function addButton() { return ''; }
 
   function render() {
     if (!domains.length) {
@@ -223,7 +220,7 @@
             '" target="_blank" rel="noopener noreferrer">Visit ' + A.esc(d.host) + '</a>' +
         '</div>' +
       '</div>' +
-      (manager
+      (false
         ? '<div class="drawer-foot">' +
             (d.status === 'live'
               ? '<button class="btn btn-danger btn-sm" data-act="paused">Take offline</button>'

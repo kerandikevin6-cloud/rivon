@@ -141,7 +141,7 @@
             '" max="' + ymd(new Date()) + '" aria-label="To"></label>'
         : '') +
       dropdown('methodSel', 'Method', [['all', 'Every method'], ['mpesa', 'M-Pesa'], ['card', 'Card']], state.method) +
-      dropdown('siteSel', 'Site', SITES, state.site) +
+      /* no site picker: this console shows one site */
     '</div>';
 
     var body;

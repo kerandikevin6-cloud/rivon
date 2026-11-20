@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RivonBinary Admin, Dashboard</title>
+<link rel="icon" href="/superadmin/assets/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/superadmin/assets/favicon-32.png">
+<link rel="apple-touch-icon" href="/superadmin/assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/superadmin/assets/css/admin.css">
+</head>
+<body data-page="dashboard" data-title="Dashboard">
+<script src="/superadmin/assets/js/config.js"></script>
+<script src="/superadmin/assets/js/api.js"></script>
+<script src="/superadmin/assets/js/admin.js"></script>
+<script>
+(function () {
+  var A = window.Admin;
+  if (!A.mountChrome()) return;   /* not signed in */
+
+  var page = document.getElementById('page');
+
+  async function load() {
+    page.innerHTML = A.loadingBlock('Loading the console');
+
+    var stats, daily, payments, queue;
+    try {
+      /* Fetched together: four sequential round trips would make the
+         dashboard feel broken on a cold Render instance. */
+      var results = await Promise.all([
+        A.data.stats(),
+        A.data.daily(14),
+        A.data.payments({ limit: 8, provider: 'payhero' }),   /* M-Pesa prompts only */
+        A.data.withdrawals({ status: 'pending', limit: 6 })
+      ]);
+      stats = results[0];
+      daily = results[1];
+      payments = results[2].payments;
+      queue = results[3].withdrawals;
+    } catch (err) {
+      page.innerHTML = A.errorBlock(err.message, 'retry');
+      document.getElementById('retry').addEventListener('click', load);
+      return;
+    }
+
+    /* ---- headline figures ----
+       Money held is first and on its own: it is what is owed to
+       customers, and the number an operator should never have to hunt
+       for. */
+    if (!stats.users && !stats.depositCount && !payments.length) {
+      page.innerHTML = A.card('Dashboard',
+        A.emptyBlock('Nothing has happened yet',
+          'Once people sign up and money starts moving, this is where it is summarised.',
+          '<a class="btn btn-ghost btn-sm" href="/superadmin/users">Open users</a>'), '', true);
+      return;
+    }
+
+    var kpis = '<div class="kpis">' +
+      A.kpi('Customer funds held', A.usd(stats.heldMinor),
+        'across ' + A.count(stats.activeUsers) + ' active accounts') +
+      A.kpi('Deposits settled', A.shortMoney(stats.depositsMinor, 'KES'),
+        A.count(stats.depositCount) + ' payments') +
+      A.kpi('Payouts awaiting review', A.usd(stats.payoutsPendingMinor),
+        stats.payoutsPending + ' request' + (stats.payoutsPending === 1 ? '' : 's'),
+        stats.payoutsPending ? 'neg' : '') +
+      A.kpi('Settlement rate', stats.settlementRate.toFixed(1) + '%',
+        stats.failedCount + ' failed',
+        stats.settlementRate >= 85 ? 'pos' : 'neg') +
+    '</div>';
+
+    /* ---- 14-day line chart: deposits as a filled area, withdrawals as
+       a line over it. Each day has a hover column with its figures. ---- */
+    var peak = Math.max(1, Math.max.apply(null, daily.map(function (d) {
+      return Math.max(d.depositsMinor, d.withdrawalsMinor);
+    })));
+    var W = 100, H = 100, n = Math.max(1, daily.length - 1);
+    function pts(key) {
+      return daily.map(function (d, i) {
+        return (daily.length === 1 ? W / 2 : i / n * W).toFixed(2) + ',' +
+          (H - d[key] / peak * H * 0.92).toFixed(2);
+      });
+    }
+    var inPts = pts('depositsMinor'), outPts = pts('withdrawalsMinor');
+    var grid = [0.25, 0.5, 0.75, 1].map(function (f) {
+      return '<div class="lc-grid" style="bottom:' + (f * 92) + '%">' +
+        '<span>' + A.shortMoney(peak * f, 'KES') + '</span></div>';
+    }).join('');
+    var bars = '<div class="lc">' +
+      '<div class="lc-plot">' + grid +
+        '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">' +
+          '<polygon class="lc-area" points="0,' + H + ' ' + inPts.join(' ') + ' ' + W + ',' + H + '"/>' +
+          '<polyline class="lc-in" points="' + inPts.join(' ') + '"/>' +
+          '<polyline class="lc-out" points="' + outPts.join(' ') + '"/>' +
+        '</svg>' +
+        '<div class="lc-hits">' + daily.map(function (d) {
+          var label = new Date(d.t).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+          return '<div title="' + label + ' — in ' +
+            A.shortMoney(d.depositsMinor, 'KES') + ', out ' +
+            A.shortMoney(d.withdrawalsMinor, 'KES') + '"></div>';
+        }).join('') + '</div>' +
+      '</div>' +
+      '<div class="lc-x">' + daily.map(function (d) {
+        return '<span>' + new Date(d.t).getDate() + '</span>';
+      }).join('') + '</div>' +
+    '</div>' +
+    '<div class="legend" style="margin-top:14px">' +
+      '<span><i class="a"></i>Deposits</span><span><i class="b"></i>Withdrawals</span>' +
+    '</div>';
+
+    var recent = payments.slice(0, 8).map(function (p) {
+      return '<tr><td>' + A.who(p.userName, p.reference) + '</td>' +
+        '<td>' + A.esc(p.providerLabel) + '</td>' +
+        '<td class="num right">' + A.money(p.amountMinor, p.currency) + '</td>' +
+        '<td class="right">' + A.pill(p.status) + '</td>' +
+        '<td class="right muted">' + A.ago(p.created) + '</td></tr>';
+    });
+
+    var waiting = queue.slice(0, 6).map(function (w) {
+      return '<tr><td>' + A.who(w.userName, w.destination) + '</td>' +
+        '<td class="num right">' + A.usd(w.amountMinor) + '</td>' +
+        '<td class="right muted">' + A.ago(w.created) + '</td></tr>';
+    });
+
+    page.innerHTML =
+      kpis +
+      '<div class="split">' +
+        A.card('Money in and out, last 14 days', bars) +
+        A.card('Payouts waiting',
+          A.table([{ label: 'Customer' }, { label: 'Amount', right: true },
+                   { label: 'Waiting', right: true }], waiting),
+          '<a class="btn btn-ghost btn-sm" href="/superadmin/withdrawals">Open queue</a>', true) +
+      '</div>' +
+      A.card('Recent deposits',
+        A.table([
+          { label: 'Customer' }, { label: 'Method' }, { label: 'Amount', right: true },
+          { label: 'Status', right: true }, { label: 'When', right: true }
+        ], recent),
+        '<a class="btn btn-ghost btn-sm" href="/superadmin/payments">See all</a>', true) +
+      (A.data.live ? '' :
+        '<div class="foot-note">Mock data held in the browser. ' +
+        'Set apiBase in assets/js/config.js to read from the API.</div>');
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

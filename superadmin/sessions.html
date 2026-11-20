@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RivonBinary Admin, Sessions</title>
+<link rel="icon" href="/superadmin/assets/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/superadmin/assets/favicon-32.png">
+<link rel="apple-touch-icon" href="/superadmin/assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/superadmin/assets/css/admin.css">
+</head>
+<body data-page="sessions" data-title="Sessions">
+<script src="/superadmin/assets/js/config.js"></script>
+<script src="/superadmin/assets/js/api.js"></script>
+<script src="/superadmin/assets/js/admin.js"></script>
+<script>
+(function () {
+  var A = window.Admin;
+  if (!A.mountChrome()) return;
+
+  var page = document.getElementById('page');
+  var sessions = [];
+  var domains = [];
+  var hosts = [];
+  /* Where hosts sign in to see their own sessions. */
+  var HOST_URL = location.origin + '/superadmin/host';
+  var ticker = null;
+
+  function elapsed(from, to) {
+    if (!from) return '\u2014';
+    var mins = Math.max(0, Math.floor(((to || Date.now()) - from) / 60000));
+    var h = Math.floor(mins / 60);
+    return (h ? h + 'h ' : '') + (mins % 60) + 'm';
+  }
+  function live() {
+    return sessions.filter(function (s) { return s.status === 'live'; })[0] || null;
+  }
+
+  async function load() {
+    page.innerHTML = A.loadingBlock('Loading sessions');
+    try {
+      var out = await Promise.all([
+        A.data.sessions(), A.data.domains(),
+        /* Hosts need sql/023; until it is run the list is just empty. */
+        A.data.hosts().catch(function () { return []; })
+      ]);
+      sessions = out[0]; domains = out[1]; hosts = out[2];
+    } catch (err) {
+      page.innerHTML = A.errorBlock(err.message, 'retry');
+      document.getElementById('retry').addEventListener('click', load);
+      return;
+    }
+    render();
+  }
+
+  function render() {
+    var s = live();
+    page.innerHTML = (s ? activeCard(s) : startCard()) + history() + hostsCard();
+    wire();
+
+    /* One interval, cleared on every render, so a re-render cannot leave
+       two running against the same element. */
+    clearInterval(ticker);
+    if (s) ticker = setInterval(function () {
+      var el = document.getElementById('runFor');
+      if (el) el.textContent = elapsed(s.startedAt);
+    }, 30000);
+  }
+
+  function kv(k, v) { return '<div class="kv"><span>' + k + '</span><b>' + v + '</b></div>'; }
+
+  function activeCard(s) {
+    var profit = s.marginMinor - s.adSpendMinor;
+    /* Return measured against earnings, not deposits: spending KSh 1 to
+       receive KSh 5 of somebody else's balance is not a return. */
+    var roas = s.adSpendMinor ? s.marginMinor / s.adSpendMinor : 0;
+
+    return '<section class="card live-card">' +
+      '<div class="card-head">' +
+        '<span class="live-dot"></span>' +
+        '<h2>Live now \u00b7 ' + A.esc(s.channel) + '</h2>' +
+        '<span class="spacer"></span>' +
+        '<span class="muted" style="font-size:12px">Running <b id="runFor">' +
+          elapsed(s.startedAt) + '</b></span>' +
+        '<button class="btn btn-danger btn-sm" id="endSession">' +
+          A.icon('stop', 14) + 'End session</button>' +
+      '</div>' +
+      '<div class="kpis" style="border:none;border-bottom:1px solid var(--line-soft)">' +
+        A.kpi('Spent on the boost', A.money(s.adSpendMinor), A.esc(s.channel)) +
+        A.kpi('Deposits during session', A.money(s.depositsMinor),
+          A.count(s.signups) + ' new accounts') +
+        A.kpi('Margin earned', A.money(s.marginMinor),
+          A.shortMoney(s.stakeVolumeMinor) + ' staked') +
+        A.kpi('Profit so far', A.money(profit),
+          roas.toFixed(2) + '\u00d7 return on spend', profit >= 0 ? 'pos' : 'neg') +
+      '</div>' +
+      '<div class="card-body">' +
+        '<div class="sess-grid">' +
+          kv('Handler', A.esc(s.handler)) +
+          kv('Domain', A.esc(s.domain || '\u2014')) +
+          kv('Started', A.dateTime(s.startedAt)) +
+          kv('Contracts placed', A.count(s.trades)) +
+          kv('Withdrawals during session', A.money(s.withdrawalsMinor)) +
+          kv('Net cash in', A.money(s.depositsMinor - s.withdrawalsMinor)) +
+        '</div>' +
+        (s.note ? '<p class="sess-note">' + A.esc(s.note) + '</p>' : '') +
+      '</div>' +
+    '</section>';
+  }
+
+  function startCard() {
+    return '<section class="card">' +
+      '<div class="card-head"><h2>Start a session</h2></div>' +
+      '<div class="card-body">' +
+        '<p class="muted" style="margin:0 0 18px;font-size:13px;line-height:1.7;max-width:62ch">' +
+          'Record what you paid to promote the stream, then everything that arrives ' +
+          'while it runs is measured against it. Only one session runs at a time, so ' +
+          'income never has to be split between two campaigns.</p>' +
+        '<form class="sess-form" id="startForm" novalidate>' +
+          '<div class="field-block"><label for="channel">Channel</label>' +
+            '<div class="field"><select id="channel">' +
+              ['TikTok Live', 'Instagram Live', 'YouTube Live', 'X Spaces', 'Other']
+                .map(function (c) { return '<option>' + c + '</option>'; }).join('') +
+            '</select></div></div>' +
+          '<div class="field-block"><label for="handler">Who is running it</label>' +
+            (activeHosts().length
+              ? '<div class="field"><select id="hostPick">' +
+                  activeHosts().map(function (h) {
+                    return '<option value="' + A.esc(h.id) + '">' + A.esc(h.name) + '</option>';
+                  }).join('') +
+                  '<option value="">Someone without a host login</option>' +
+                '</select></div>' +
+                '<div class="field" id="handlerBox" hidden style="margin-top:6px">' +
+                  '<input id="handler" placeholder="Name of the host"></div>'
+              : '<div class="field"><input id="handler" placeholder="Name of the host"></div>') +
+            '<div class="field-error" id="handlerError" hidden></div></div>' +
+          '<div class="field-block"><label for="spend">Paid to boost (KSh)</label>' +
+            '<div class="field"><input id="spend" inputmode="decimal" placeholder="3000"></div>' +
+            '<div class="field-error" id="spendError" hidden></div></div>' +
+          '<div class="field-block"><label for="domain">Domain being promoted</label>' +
+            '<div class="field"><select id="domain">' +
+              (domains.length
+                ? domains.map(function (d) {
+                    return '<option value="' + A.esc(d.host) + '">' + A.esc(d.host) + '</option>';
+                  }).join('')
+                : '<option value="">No domains listed</option>') +
+            '</select></div></div>' +
+          '<div class="field-block sess-wide"><label for="note">Note</label>' +
+            '<div class="field"><input id="note" placeholder="What the stream is about"></div></div>' +
+          '<button class="btn btn-primary sess-go" type="submit">' +
+            A.icon('live', 15) + 'Start session</button>' +
+        '</form>' +
+      '</div>' +
+    '</section>';
+  }
+
+  function history() {
+    var past = sessions.filter(function (s) { return s.status !== 'live'; });
+    if (!past.length) {
+      return A.card('Past sessions',
+        A.emptyBlock('No sessions have run yet',
+          'Once a stream ends, what it cost and what it earned is kept here.'), '', true);
+    }
+
+    var spend = past.reduce(function (a, s) { return a + s.adSpendMinor; }, 0);
+    var earned = past.reduce(function (a, s) { return a + s.marginMinor; }, 0);
+    var winners = past.filter(function (s) { return s.marginMinor >= s.adSpendMinor; }).length;
+
+    var rows = past.map(function (s) {
+      var profit = s.marginMinor - s.adSpendMinor;
+      return '<tr>' +
+        '<td>' + A.who(s.channel, A.esc(s.handler) + ' \u00b7 ' + A.date(s.startedAt)) + '</td>' +
+        '<td class="muted">' + A.esc(s.domain || '\u2014') + '</td>' +
+        '<td class="num right">' + elapsed(s.startedAt, s.endedAt) + '</td>' +
+        '<td class="num right">' + A.money(s.adSpendMinor) + '</td>' +
+        '<td class="num right">' + A.money(s.depositsMinor) + '</td>' +
+        '<td class="num right">' + A.money(s.marginMinor) + '</td>' +
+        '<td class="num right ' + (profit >= 0 ? 'pos' : 'neg') + '">' + A.money(profit) + '</td>' +
+      '</tr>';
+    });
+
+    return '<div class="kpis">' +
+        A.kpi('Sessions run', A.count(past.length), winners + ' paid for themselves',
+          winners >= past.length / 2 ? 'pos' : 'neg') +
+        A.kpi('Total spent', A.money(spend), 'across all channels') +
+        A.kpi('Total margin earned', A.money(earned), 'from session traffic') +
+        A.kpi('Net', A.money(earned - spend),
+          earned >= spend ? 'ahead overall' : 'behind overall',
+          earned - spend >= 0 ? 'pos' : 'neg') +
+      '</div>' +
+      A.card('Past sessions',
+        A.table([
+          { label: 'Session' }, { label: 'Domain' }, { label: 'Ran for', right: true },
+          { label: 'Spend', right: true }, { label: 'Deposits', right: true },
+          { label: 'Margin', right: true }, { label: 'Profit', right: true }
+        ], rows), '', true) +
+      '<div class="foot-note">Profit is margin earned less what the boost cost. ' +
+        'Deposits are shown for context but they are customer money, not income.</div>';
+  }
+
+  function activeHosts() {
+    return hosts.filter(function (h) { return h.status === 'active'; });
+  }
+
+  function hostsCard() {
+    var rows = hosts.map(function (h) {
+      var mine = sessions.filter(function (x) { return x.hostId === h.id; });
+      var earned = mine.reduce(function (a, x) { return a + x.marginMinor; }, 0);
+      return '<tr>' +
+        '<td>' + A.who(h.name, h.username) + '</td>' +
+        '<td>' + A.pill(h.status === 'active' ? 'active' : 'suspended') + '</td>' +
+        '<td class="num right">' + A.count(mine.length) + '</td>' +
+        '<td class="num right">' + A.money(earned) + '</td>' +
+        '<td class="right muted">' + (h.lastSeenAt ? A.ago(Date.parse(h.lastSeenAt)) : 'Never') + '</td>' +
+        '<td class="right">' +
+          '<button class="btn btn-ghost btn-sm" data-hostpw="' + A.esc(h.id) + '">New password</button> ' +
+          '<button class="btn btn-ghost btn-sm" data-hosttoggle="' + A.esc(h.id) + '">' +
+            (h.status === 'active' ? 'Switch off' : 'Switch on') + '</button>' +
+        '</td>' +
+      '</tr>';
+    });
+    var add = '<button class="btn btn-primary btn-sm" id="addHost">' + A.icon('plus', 15) + 'Add host</button>';
+    return A.card('Hosts', hosts.length
+        ? A.table([
+            { label: 'Host' }, { label: 'Status' }, { label: 'Sessions', right: true },
+            { label: 'Earned', right: true }, { label: 'Last signed in', right: true },
+            { label: '', right: true }
+          ], rows)
+        : A.emptyBlock('No hosts yet',
+            'Add a host to give them a login. They see their own sessions and what each one earned.'),
+        add, true) +
+      '<div class="foot-note">Hosts sign in at <b class="num">' + A.esc(HOST_URL) + '</b> ' +
+        '<button class="btn btn-ghost btn-sm" id="copyHostUrl">' + A.icon('copy', 14) + 'Copy link</button>' +
+        '<br>They see their sessions, sign-ups, deposits and earnings. They do not see the boost spend, ' +
+        'customers, or anything else in the console.</div>';
+  }
+
+  function hostDrawer(h) {
+    A.openDrawer(
+      '<div class="drawer-head">' +
+        '<div style="flex:1"><h2>' + (h ? 'New password for ' + A.esc(h.name) : 'Add a host') + '</h2>' +
+        '<p>' + (h ? 'Their old password stops working straight away.'
+                   : 'Give them the username and password to sign in at the host page.') + '</p></div>' +
+        '<button class="iconbtn" data-close aria-label="Close">' + A.icon('close', 18) + '</button>' +
+      '</div>' +
+      '<div class="drawer-body">' +
+        (h ? '' :
+          '<div class="field-block"><label for="hName">Name</label>' +
+            '<div class="field"><input id="hName" maxlength="80" placeholder="As they appear on the stream"></div></div>' +
+          '<div class="field-block"><label for="hUser">Username</label>' +
+            '<div class="field"><input id="hUser" maxlength="40" autocomplete="off" placeholder="e.g. juli"></div></div>') +
+        '<div class="field-block"><label for="hPass">Password</label>' +
+          '<div class="field"><input id="hPass" type="text" autocomplete="off" placeholder="At least 8 characters"></div>' +
+          '<span class="hint">Shown here once so you can send it to them.</span></div>' +
+        '<div class="field-error" id="hError" hidden></div>' +
+      '</div>' +
+      '<div class="drawer-foot">' +
+        '<button class="btn btn-primary btn-sm" data-act="saveHost">' + (h ? 'Set password' : 'Add host') + '</button>' +
+        '<button class="btn btn-ghost btn-sm" id="cancelHost">Cancel</button>' +
+      '</div>');
+    document.getElementById('cancelHost').addEventListener('click', A.closeAll);
+
+    var pass = document.getElementById('hPass');
+    pass.value = Math.random().toString(36).slice(2, 7) + Math.random().toString(36).slice(2, 7);
+
+    document.querySelector('.drawer-foot').addEventListener('click', async function (e) {
+      var b = e.target.closest('[data-act="saveHost"]');
+      if (!b) return;
+      var box = document.getElementById('hError');
+      box.hidden = true;
+      b.disabled = true;
+      var username;
+      try {
+        if (h) {
+          await A.data.updateHost(h.id, { password: pass.value });
+          username = h.username;
+        } else {
+          var made = await A.data.createHost({
+            name: document.getElementById('hName').value.trim(),
+            username: document.getElementById('hUser').value.trim(),
+            password: pass.value
+          });
+          username = made.username;
+        }
+      } catch (e2) {
+        b.disabled = false;
+        box.textContent = e2.message; box.hidden = false; return;
+      }
+      /* Shown once, here, so it can be sent to the host. */
+      var details = ['Sign in: ' + HOST_URL, 'Username: ' + username,
+        'Password: ' + pass.value].join(String.fromCharCode(10));
+      document.querySelector('.drawer-body').innerHTML =
+        '<div class="sect-label">Send this to the host</div>' +
+        '<div class="ticket-body num">' + A.esc(details) + '</div>';
+      document.querySelector('.drawer-foot').innerHTML =
+        '<button class="btn btn-primary btn-sm" id="copyDetails">' + A.icon('copy', 14) + 'Copy</button>' +
+        '<button class="btn btn-ghost btn-sm" id="doneDetails">Done</button>';
+      document.getElementById('doneDetails').addEventListener('click', function (ev) {
+        ev.stopPropagation(); A.closeAll();
+      });
+      document.getElementById('copyDetails').addEventListener('click', function (ev) {
+        ev.stopPropagation(); A.copyText(details);
+      });
+      load();
+    });
+  }
+
+  function err(id, msg) {
+    var box = document.getElementById(id);
+    if (!box) return;
+    box.textContent = msg || '';
+    box.hidden = !msg;
+    box.previousElementSibling.classList.toggle('bad', !!msg);
+  }
+
+  function wire() {
+    var pick = document.getElementById('hostPick');
+    if (pick) pick.addEventListener('change', function () {
+      document.getElementById('handlerBox').hidden = !!this.value;
+    });
+    var addHost = document.getElementById('addHost');
+    if (addHost) addHost.addEventListener('click', function () { hostDrawer(null); });
+    var copyUrl = document.getElementById('copyHostUrl');
+    if (copyUrl) copyUrl.addEventListener('click', function () { A.copyText(HOST_URL); });
+    page.querySelectorAll('[data-hostpw]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-hostpw');
+        hostDrawer(hosts.filter(function (h) { return h.id === id; })[0]);
+      });
+    });
+    page.querySelectorAll('[data-hosttoggle]').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        var h = hosts.filter(function (x) { return x.id === b.getAttribute('data-hosttoggle'); })[0];
+        if (!h) return;
+        b.disabled = true;
+        try {
+          await A.data.updateHost(h.id, { status: h.status === 'active' ? 'disabled' : 'active' });
+        } catch (e2) { b.disabled = false; A.toast(e2.message); return; }
+        await load();
+        A.toast(h.status === 'active' ? h.name + ' can no longer sign in' : h.name + ' can sign in again');
+      });
+    });
+
+    var endBtn = document.getElementById('endSession');
+    if (endBtn) endBtn.addEventListener('click', function () {
+      var s = live();
+      if (!s) return;
+      var profit = s.marginMinor - s.adSpendMinor;
+      A.openDrawer(
+        '<div class="drawer-head">' +
+          '<div style="flex:1"><h2>End this session?</h2>' +
+          '<p>' + A.esc(s.channel) + ' \u00b7 running ' + elapsed(s.startedAt) + '</p></div>' +
+          '<button class="iconbtn" data-close aria-label="Close">' + A.icon('close', 18) + '</button>' +
+        '</div>' +
+        '<div class="drawer-body">' +
+          '<div><div class="sect-label">Final figures</div>' +
+            kv('Spent', A.money(s.adSpendMinor)) +
+            kv('Deposits', A.money(s.depositsMinor)) +
+            kv('Margin earned', A.money(s.marginMinor)) +
+            kv('Profit', A.money(profit)) +
+          '</div>' +
+          '<p class="muted" style="font-size:12.5px;line-height:1.7;margin:0">' +
+            'Money arriving afterwards is no longer counted against this session.</p>' +
+        '</div>' +
+        '<div class="drawer-foot">' +
+          '<button class="btn btn-danger btn-sm" data-act="end">End session</button>' +
+          '<button class="btn btn-ghost btn-sm" data-close>Keep running</button>' +
+        '</div>');
+
+      document.querySelector('.drawer-foot').addEventListener('click', async function (e) {
+        var b = e.target.closest('[data-act="end"]');
+        if (!b) return;
+        b.disabled = true;
+        b.innerHTML = A.loader('sm') + 'Ending';
+        try {
+          await A.data.endSession(s.id);
+        } catch (e2) {
+          b.disabled = false; b.textContent = 'End session';
+          A.toast(e2.message); return;
+        }
+        A.closeAll();
+        await load();
+        A.toast('Session ended \u2014 ' + A.money(profit) + ' profit');
+      });
+    });
+
+    var form = document.getElementById('startForm');
+    if (form) form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var handler = document.getElementById('handler');
+      var pickBox = document.getElementById('hostPick');
+      var hostId = pickBox ? pickBox.value : '';
+      var hostName = hostId ? pickBox.options[pickBox.selectedIndex].text : handler.value.trim();
+      var spend = document.getElementById('spend');
+      var bad = null;
+
+      err('handlerError', ''); err('spendError', '');
+      if (!hostName) { err('handlerError', 'Who is hosting it?'); bad = handler; }
+      var amount = Number(String(spend.value).replace(/[^\d.]/g, ''));
+      if (!amount || amount <= 0) {
+        err('spendError', 'Enter what you paid to boost it'); bad = bad || spend;
+      }
+      if (bad) { bad.focus(); return; }
+
+      var go = form.querySelector('[type=submit]');
+      go.disabled = true;
+      go.innerHTML = A.loader('sm') + 'Starting';
+
+      try {
+        await A.data.startSession({
+          channel: document.getElementById('channel').value,
+          handler: hostName,
+          hostId: hostId || undefined,
+          domain: document.getElementById('domain').value || undefined,
+          note: document.getElementById('note').value.trim() || undefined,
+          adSpendMinor: Math.round(amount * 100)
+        });
+      } catch (e2) {
+        go.disabled = false;
+        go.innerHTML = A.icon('live', 15) + 'Start session';
+        A.toast(e2.message); return;
+      }
+
+      await load();
+      A.toast('Session started. Income from now on counts towards it.');
+    });
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

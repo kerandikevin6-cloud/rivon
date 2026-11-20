@@ -16,6 +16,13 @@
       ]
     },
     {
+      "source": "/superadmin(.*)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        { "key": "Cache-Control", "value": "no-cache" }
+      ]
+    },
+    {
       "source": "/sw.js",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache" }
@@ -37,6 +44,7 @@
 
   "redirects": [
     { "source": "/index", "destination": "/", "permanent": true },
+    { "source": "/superadmin/index", "destination": "/superadmin", "permanent": true },
     { "source": "/home", "destination": "/", "permanent": false },
     { "source": "/landing", "destination": "/", "permanent": false },
     { "source": "/terms-and-conditions", "destination": "/terms", "permanent": true },

@@ -49,6 +49,10 @@ self.addEventListener('activate', function (e) {
 self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
   if (new URL(e.request.url).origin !== self.location.origin) return;
+  /* The operator console is never cached or served from the shell:
+     it must always be the live page, and offline it must not fall
+     back to the trading terminal. */
+  if (/^\/superadmin(\/|$)/.test(new URL(e.request.url).pathname)) return;
 
   e.respondWith(
     fetch(e.request).then(function (res) {
